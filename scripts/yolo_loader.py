@@ -18,15 +18,20 @@ class MOTDataset(torch.utils.data.Dataset):
         self.file_list = []
         for seq_folder in os.listdir(data_path):
             seq_path = os.path.join(data_path, seq_folder)
+            gt_path = os.path.join(seq_path, 'gt', 'gt.txt')
+            gt_df = pd.read_csv(gt_path, names=['frame', 'id', 'xmin', 'ymin', 'xmax', 'ymax', 'drop1', 'drop2', 'drop3'])
+            gt_df['xmax'] += gt_df['xmin']
+            gt_df['ymax'] += gt_df['ymin']
+
             if not os.path.isdir(seq_path):
                 continue
-            seq_files = sorted(os.listdir(seq_path))
+            seq_files = sorted(os.listdir(os.path.join(seq_path, 'img1')))
             for i in range(n_frames, len(seq_files)):
                 data = {'seq_path': seq_path, 'frame_idx': i, 'detections': []}
                 for j in range(i-n_frames, i):
-                    frame_path = os.path.join(seq_path, seq_files[j])
-                    data['detections'].append(load_detections(frame_path))
-                data['detections'].append(load_detections(os.path.join(seq_path, seq_files[i])))
+                    frame_path = os.path.join(seq_path, 'img1' seq_files[j])
+                    data['detections'].append(load_detections(gt_df, j))
+                data['detections'].append(load_detections(gt_df, i))
                 self.file_list.append(data)
 
     def __len__(self):
@@ -49,9 +54,7 @@ class MOTDataset(torch.utils.data.Dataset):
 
         tracker = HistoryKeeper()
         for detection in current_detections:
-            tracker.add_detection(detection)
-        
-        tracker.update()
+            tracker.update()
 
         return {'history': history, 'current_image': current_image, 'current_detections': current_detections, 'tracker': tracker}
 
@@ -60,7 +63,18 @@ def load_image(path):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
-def load_detections(path):
+def load_detections(gt_df, frame):
     # load detections from file
+    sel_df = gt_df[gt_df['frame'] == frame]
+    detections = []
+    for idx, row in sel_df.iterrows():
+        det = {}
+        det['xmin'] = row['xmin']
+        det['ymin'] = row['ymin']
+        det['xmax'] = row['xmax']
+        det['ymax'] = row['ymax']
+        det['ID'] = row['id']
+        detections.append(det)
     # return as a list of dictionaries containing xmin, ymin, xmax, ymax, and ID
-    pass
+    
+    
